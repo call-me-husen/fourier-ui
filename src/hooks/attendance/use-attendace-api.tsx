@@ -3,11 +3,14 @@ import {
   API_ATTENDANCE_CLOCK_OUT_PATH,
   API_ATTENDANCE_DASHBOARD_PATH,
   API_ATTENDANCE_HISTORY_PATH,
+  API_ATTENDANCE_REPORT_PATH,
   AttendanceClockInRequest,
   AttendanceClockOutRequest,
   AttendanceDashboardResponse,
   AttendanceHistoryRequest,
   AttendanceHistoryResponse,
+  AttendanceReportRequest,
+  AttendanceReportResponse,
 } from "@/services/attendance";
 import useAPI from "../core/use-api";
 
@@ -34,4 +37,10 @@ export function useClockOut() {
   return useAPI<unknown, AttendanceClockOutRequest>(API_ATTENDANCE_CLOCK_OUT_PATH, {
     method: "POST",
   });
+}
+
+export function useAttendanceReport() {
+  return useAPI<AttendanceReportResponse, AttendanceReportRequest>(API_ATTENDANCE_REPORT_PATH, {
+    method: "GET",
+  })
 }

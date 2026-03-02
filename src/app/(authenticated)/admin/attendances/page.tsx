@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Search,
   User,
@@ -17,6 +17,7 @@ import {
   ArrowRightLeft,
 } from "lucide-react";
 import cn from "@/lib/styles/cn";
+import { useAttendanceReport } from "@/hooks/attendance/use-attendace-api";
 
 interface AttendanceRecord {
   employeeId: string;
@@ -30,98 +31,7 @@ interface AttendanceRecord {
   averageWorkingHoursPerDay: number;
 }
 
-const mockAttendances: AttendanceRecord[] = [
-  {
-    employeeId: "emp-1",
-    employeeName: "John Doe",
-    department: "Engineering",
-    employmentType: "fulltime",
-    daysOfPresent: 4,
-    daysOfAbsent: 1,
-    daysOfIncomplete: 0,
-    totalWorkingHours: 38.5,
-    averageWorkingHoursPerDay: 7.7,
-  },
-  {
-    employeeId: "emp-2",
-    employeeName: "Jane Smith",
-    department: "Engineering",
-    employmentType: "fulltime",
-    daysOfPresent: 5,
-    daysOfAbsent: 0,
-    daysOfIncomplete: 0,
-    totalWorkingHours: 40.2,
-    averageWorkingHoursPerDay: 8.04,
-  },
-  {
-    employeeId: "emp-3",
-    employeeName: "Bob Wilson",
-    department: "Marketing",
-    employmentType: "contractor",
-    daysOfPresent: 3,
-    daysOfAbsent: 2,
-    daysOfIncomplete: 1,
-    totalWorkingHours: 24.0,
-    averageWorkingHoursPerDay: 6.0,
-  },
-  {
-    employeeId: "emp-4",
-    employeeName: "Alice Brown",
-    department: "Human Resources",
-    employmentType: "intern",
-    daysOfPresent: 4,
-    daysOfAbsent: 0,
-    daysOfIncomplete: 1,
-    totalWorkingHours: 28.5,
-    averageWorkingHoursPerDay: 5.7,
-  },
-  {
-    employeeId: "emp-5",
-    employeeName: "Charlie Davis",
-    department: "Marketing",
-    employmentType: "parttime",
-    daysOfPresent: 2,
-    daysOfAbsent: 1,
-    daysOfIncomplete: 0,
-    totalWorkingHours: 14.0,
-    averageWorkingHoursPerDay: 7.0,
-  },
-  {
-    employeeId: "emp-6",
-    employeeName: "Emily Johnson",
-    department: "Engineering",
-    employmentType: "fulltime",
-    daysOfPresent: 5,
-    daysOfAbsent: 0,
-    daysOfIncomplete: 0,
-    totalWorkingHours: 42.0,
-    averageWorkingHoursPerDay: 8.4,
-  },
-  {
-    employeeId: "emp-7",
-    employeeName: "David Miller",
-    department: "Human Resources",
-    employmentType: "fulltime",
-    daysOfPresent: 4,
-    daysOfAbsent: 1,
-    daysOfIncomplete: 0,
-    totalWorkingHours: 36.5,
-    averageWorkingHoursPerDay: 7.3,
-  },
-  {
-    employeeId: "emp-8",
-    employeeName: "Sarah Anderson",
-    department: "Marketing",
-    employmentType: "contractor",
-    daysOfPresent: 3,
-    daysOfAbsent: 0,
-    daysOfIncomplete: 2,
-    totalWorkingHours: 21.5,
-    averageWorkingHoursPerDay: 5.375,
-  },
-];
-
-const ITEMS_PER_PAGE = 5;
+const ITEMS_PER_PAGE = 10;
 
 function getWeekDates() {
   const now = new Date();
@@ -138,19 +48,23 @@ function getWeekDates() {
 
 export default function AdminAttendances() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
   const [startDate, setStartDate] = useState(getWeekDates().startDate);
   const [endDate, setEndDate] = useState(getWeekDates().endDate);
   const [currentPage, setCurrentPage] = useState(1);
+  const { data, fetcher } = useAttendanceReport();
 
-  const filteredAttendances = mockAttendances.filter((record) =>
-    record.employeeName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredAttendances = data?.records.filter((record) => {
+    const fullName = `${record.firstName} ${record.lastName}`.toLowerCase();
+
+    return fullName.includes(debouncedSearchQuery.toLowerCase());
+  }) || [];
 
   const totalPages = Math.ceil(filteredAttendances.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const paginatedAttendances = filteredAttendances.slice(
     startIndex,
-    startIndex + ITEMS_PER_PAGE
+    startIndex + ITEMS_PER_PAGE,
   );
 
   const getEmploymentTypeBadge = (type: string) => {
@@ -163,9 +77,28 @@ export default function AdminAttendances() {
     return styles[type] || "bg-muted text-muted-foreground";
   };
 
-  const formatHours = (hours: number) => {
-    return hours.toFixed(1);
+  const formatHours = (ms: number) => {
+    // HH:MM:DD format
+    const totalHours = Math.floor(ms / (1000 * 60 * 60));
+    const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((ms % (1000 * 60)) / 1000);
+    return `${totalHours}h ${minutes}m ${seconds}s`;
   };
+
+  // Debounce search input
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    fetcher({
+      from: startDate,
+      to: endDate,
+    });
+  }, [startDate, endDate]);
 
   return (
     <div className="space-y-6">
@@ -180,8 +113,8 @@ export default function AdminAttendances() {
       </div>
 
       <div className="group relative bg-card/80 backdrop-blur-xl rounded-3xl border border-border/50 shadow-lg animate-fade-in">
-        <div className="p-4 border-b border-border/50 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-          <div className="relative flex-1 max-w-md">
+        <div className="p-4 border-b border-border/50 flex flex-col md:flex-row gap-4 justify-between items-start sm:items-center">
+          <div className="relative flex-1 w-full md:max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
@@ -194,8 +127,8 @@ export default function AdminAttendances() {
               className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-muted/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"
             />
           </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
+          <div className="flex flex-col md:flex-row items-center gap-2 w-full md:w-auto">
+            <div className="relative w-full md:w-auto">
               <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
                 type="date"
@@ -204,11 +137,11 @@ export default function AdminAttendances() {
                   setStartDate(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="pl-10 pr-4 py-2.5 rounded-xl bg-muted/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all cursor-pointer"
+                className="pl-10 pr-4 py-2.5 rounded-xl bg-muted/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all cursor-pointer w-full md:w-auto"
               />
             </div>
             <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
-            <div className="relative">
+            <div className="relative w-full md:w-auto">
               <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
                 type="date"
@@ -217,7 +150,7 @@ export default function AdminAttendances() {
                   setEndDate(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="pl-10 pr-4 py-2.5 rounded-xl bg-muted/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all cursor-pointer"
+                className="pl-10 pr-4 py-2.5 rounded-xl bg-muted/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all cursor-pointer w-full md:w-auto"
               />
             </div>
           </div>
@@ -237,46 +170,54 @@ export default function AdminAttendances() {
                     <User className="h-6 w-6 text-white" />
                   </div>
                   <div>
-                    <p className="font-semibold text-lg">{record.employeeName}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {record.department}
+                    <p className="font-semibold text-lg">
+                      {record.firstName} {record.lastName}
                     </p>
+                    {/* <p className="text-sm text-muted-foreground">
+                      {record.}
+                    </p> */}
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => console.log("View Details", record.employeeId)}
                   className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-indigo-500"
                 >
                   <Eye className="h-4 w-4" />
                 </button>
               </div>
-              
+
               <div className="mt-4 space-y-3">
-                <div className="flex items-center gap-2">
+                {/* <div className="flex items-center gap-2">
                   <span
                     className={cn(
                       "inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium capitalize",
-                      getEmploymentTypeBadge(record.employmentType)
+                      getEmploymentTypeBadge(record.employmentType),
                     )}
                   >
                     {record.employmentType}
                   </span>
-                </div>
-                
+                </div> */}
+
                 <div className="grid grid-cols-3 gap-2">
                   <div className="bg-emerald-500/10 rounded-lg p-2 text-center">
                     <CheckCircle className="h-4 w-4 mx-auto text-emerald-500 mb-1" />
-                    <p className="text-lg font-bold text-emerald-500">{record.daysOfPresent}</p>
+                    <p className="text-lg font-bold text-emerald-500">
+                      {record.present}
+                    </p>
                     <p className="text-xs text-muted-foreground">Present</p>
                   </div>
                   <div className="bg-red-500/10 rounded-lg p-2 text-center">
                     <XCircle className="h-4 w-4 mx-auto text-red-500 mb-1" />
-                    <p className="text-lg font-bold text-red-500">{record.daysOfAbsent}</p>
+                    <p className="text-lg font-bold text-red-500">
+                      {record.absent}
+                    </p>
                     <p className="text-xs text-muted-foreground">Absent</p>
                   </div>
                   <div className="bg-amber-500/10 rounded-lg p-2 text-center">
                     <AlertCircle className="h-4 w-4 mx-auto text-amber-500 mb-1" />
-                    <p className="text-lg font-bold text-amber-500">{record.daysOfIncomplete}</p>
+                    <p className="text-lg font-bold text-amber-500">
+                      {record.incomplete}
+                    </p>
                     <p className="text-xs text-muted-foreground">Incomplete</p>
                   </div>
                 </div>
@@ -287,7 +228,7 @@ export default function AdminAttendances() {
                     <span>Total: {formatHours(record.totalWorkingHours)}h</span>
                   </div>
                   <div className="text-muted-foreground">
-                    Avg: {formatHours(record.averageWorkingHoursPerDay)}h/day
+                    Avg: {formatHours(record.avgDailyWorkingHours)}h/day
                   </div>
                 </div>
               </div>
@@ -303,9 +244,9 @@ export default function AdminAttendances() {
                 <th className="text-left p-4 px-6 text-sm font-semibold text-muted-foreground">
                   Employee
                 </th>
-                <th className="text-left p-4 px-6 text-sm font-semibold text-muted-foreground">
+                {/* <th className="text-left p-4 px-6 text-sm font-semibold text-muted-foreground">
                   Type
-                </th>
+                </th> */}
                 <th className="text-center p-4 px-6 text-sm font-semibold text-muted-foreground">
                   Present
                 </th>
@@ -339,47 +280,53 @@ export default function AdminAttendances() {
                         <User className="h-5 w-5 text-white" />
                       </div>
                       <div>
-                        <p className="font-medium">{record.employeeName}</p>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="font-medium">{record.firstName} {record.lastName}</p>
+                        {/* <p className="text-sm text-muted-foreground">
                           {record.department}
-                        </p>
+                        </p> */}
                       </div>
                     </div>
                   </td>
-                  <td className="p-4 px-6">
+                  {/* <td className="p-4 px-6">
                     <span
                       className={cn(
                         "inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium capitalize",
-                        getEmploymentTypeBadge(record.employmentType)
+                        getEmploymentTypeBadge(record.employmentType),
                       )}
                     >
                       {record.employmentType}
                     </span>
-                  </td>
+                  </td> */}
                   <td className="p-4 px-6 text-center">
                     <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-500 font-semibold">
-                      {record.daysOfPresent}
+                      {record.present}
                     </span>
                   </td>
                   <td className="p-4 px-6 text-center">
                     <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-500/20 text-red-500 font-semibold">
-                      {record.daysOfAbsent}
+                      {record.absent}
                     </span>
                   </td>
                   <td className="p-4 px-6 text-center">
                     <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/20 text-amber-500 font-semibold">
-                      {record.daysOfIncomplete}
+                      {record.incomplete}
                     </span>
                   </td>
                   <td className="p-4 px-6 text-right">
-                    <span className="font-medium">{formatHours(record.totalWorkingHours)}h</span>
+                    <span className="font-medium">
+                      {formatHours(record.totalWorkingHours)}h
+                    </span>
                   </td>
                   <td className="p-4 px-6 text-right">
-                    <span className="text-muted-foreground">{formatHours(record.averageWorkingHoursPerDay)}h</span>
+                    <span className="text-muted-foreground">
+                      {formatHours(record.avgDailyWorkingHours)}h
+                    </span>
                   </td>
                   <td className="p-4 px-6 text-right">
-                    <button 
-                      onClick={() => console.log("View Details", record.employeeId)}
+                    <button
+                      onClick={() =>
+                        console.log("View Details", record.employeeId)
+                      }
                       className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-indigo-500 hover:bg-indigo-500/10 transition-colors"
                     >
                       <Eye className="h-4 w-4" />
@@ -403,8 +350,11 @@ export default function AdminAttendances() {
           <div className="p-4 border-t border-border/50 flex flex-col sm:flex-row gap-4 justify-between items-center">
             <p className="text-sm text-muted-foreground">
               Showing {startIndex + 1} to{" "}
-              {Math.min(startIndex + ITEMS_PER_PAGE, filteredAttendances.length)} of{" "}
-              {filteredAttendances.length} records
+              {Math.min(
+                startIndex + ITEMS_PER_PAGE,
+                filteredAttendances.length,
+              )}{" "}
+              of {filteredAttendances.length} records
             </p>
             <div className="flex items-center gap-2">
               <button
@@ -422,23 +372,27 @@ export default function AdminAttendances() {
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <div className="flex items-center gap-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={cn(
-                      "w-8 h-8 rounded-lg text-sm font-medium transition-colors",
-                      currentPage === page
-                        ? "bg-indigo-500 text-white"
-                        : "hover:bg-muted"
-                    )}
-                  >
-                    {page}
-                  </button>
-                ))}
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                  (page) => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={cn(
+                        "w-8 h-8 rounded-lg text-sm font-medium transition-colors",
+                        currentPage === page
+                          ? "bg-indigo-500 text-white"
+                          : "hover:bg-muted",
+                      )}
+                    >
+                      {page}
+                    </button>
+                  ),
+                )}
               </div>
               <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                onClick={() =>
+                  setCurrentPage((p) => Math.min(totalPages, p + 1))
+                }
                 disabled={currentPage === totalPages}
                 className="p-2 rounded-lg hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
