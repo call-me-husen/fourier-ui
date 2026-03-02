@@ -81,7 +81,7 @@ async function handleProxy(req: NextRequest, path: string) {
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
   const { path } = await params;
   const apiPath = path.join("/");
@@ -92,7 +92,7 @@ export async function GET(
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
   const { path } = await params;
   const apiPath = path.join("/");
@@ -102,7 +102,7 @@ export async function POST(
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
   const { path } = await params;
   const apiPath = path.join("/");
@@ -111,7 +111,7 @@ export async function PUT(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
   const { path } = await params;
   const apiPath = path.join("/");
